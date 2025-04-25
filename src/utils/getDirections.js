@@ -2,9 +2,8 @@ const OPENROUTE_API_KEY = "5b3ce3597851110001cf62481f0ee85b9e434016bc12215049564
 
 export const getDirections = async (startLat, startLng, endLat, endLng) => {
   try {
-    // const url = `https://api.openrouteservice.org/v2/directions/foot-walking?api_key=${OPENROUTE_API_KEY}&start=${startLng},${startLat}&end=${endLng},${endLat}`;
-    
-    const url=`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${OPENROUTE_API_KEY}&start=77.1025,28.7041&end=77.3910,28.5355`;
+    // Dynamically construct the URL using the provided coordinates
+    const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${OPENROUTE_API_KEY}&start=${startLng},${startLat}&end=${endLng},${startLat}`;
 
     const response = await fetch(url);
     const data = await response.json();

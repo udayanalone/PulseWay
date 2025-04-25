@@ -8,10 +8,12 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
+import BackgroundWrapper from "../component/BackgroundWrapper";
+import Button from "../component/Button"; // Assuming Button is a custom component
 
 const IndexScreen = () => {
     const navigation = useNavigation();
-    const [authType, setAuthType] = useState("login"); 
+    const [authType, setAuthType] = useState("login");
     const scaleAnim = new Animated.Value(1);
 
     const handlePressIn = () => {
@@ -33,69 +35,58 @@ const IndexScreen = () => {
     const handleDashboardNavigation = (dashboard) => {
         const routes = {
             ambulance: authType === "signup" ? "ambulance_signup" : "AmbulanceDashboard",
-            hospital: authType === "signup" ? "hospital_signup" : "Hospital"
+            hospital: authType === "signup" ? "hospital_signup" : "Hospital_Dashboard",
         };
         navigation.navigate(routes[dashboard], { authType });
     };
 
     return (
-        <LinearGradient
-            colors={["#e0f7fa", "#ffffff"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.container}
-        >
-            <Text style={styles.title}>🚑 Welcome to ZatPat</Text>
-            <Text style={styles.subtitle}>Quick, Reliable Emergency Assistance</Text>
+        <BackgroundWrapper>
+            <View style={styles.content}>
+                <Text style={styles.title}>Welcome to PulseWay</Text>
+                <Text style={styles.subtitle}>Quick, Reliable Emergency Assistance</Text>
 
-            {/* Toggle Authentication Type */}
-            <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                    onPress={() => setAuthType("login")}
-                    style={[styles.toggleButton, authType === "login" && styles.activeToggle]}
-                >
-                    <Text style={[styles.toggleText, authType === "login" && styles.activeToggleText]}>
-                        🔐 Login
-                    </Text>
-                </TouchableOpacity>
+                {/* Toggle Authentication Type */}
+                <View style={styles.toggleContainer}>
+                    <TouchableOpacity
+                        onPress={() => setAuthType("login")}
+                        style={[styles.toggleButton, authType === "login" && styles.activeToggle]}
+                    >
+                        <Text style={[styles.toggleText, authType === "login" && styles.activeToggleText]}>
+                            🔐 Login
+                        </Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                    onPress={() => setAuthType("signup")}
-                    style={[styles.toggleButton, authType === "signup" && styles.activeToggle]}
-                >
-                    <Text style={[styles.toggleText, authType === "signup" && styles.activeToggleText]}>
-                        📝 Sign Up
-                    </Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => setAuthType("signup")}
+                        style={[styles.toggleButton, authType === "signup" && styles.activeToggle]}
+                    >
+                        <Text style={[styles.toggleText, authType === "signup" && styles.activeToggleText]}>
+                            📝 Sign Up
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Dashboard Navigation */}
+                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                    <Button
+                        title="🚑 Ambulance Dashboard"
+                        onPress={() => handleDashboardNavigation("ambulance")}
+                        gradientColors={["#4fc3f7", "#0288d1"]}
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                    />
+
+                    <Button
+                        title="🏥 Hospital Dashboard"
+                        onPress={() => handleDashboardNavigation("hospital")}
+                        gradientColors={["#81d4fa", "#1565c0"]}
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                    />
+                </Animated.View>
             </View>
-
-            {/* Dashboard Navigation */}
-            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <TouchableOpacity
-                    onPress={() => handleDashboardNavigation("ambulance")}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    style={styles.dashboardButton}
-                    activeOpacity={0.8}
-                >
-                    <LinearGradient colors={["#4fc3f7", "#0288d1"]} style={styles.gradientButton}>
-                        <Text style={styles.dashboardButtonText}>🚑 Ambulance Dashboard</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    onPress={() => handleDashboardNavigation("hospital")}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    style={styles.dashboardButton}
-                    activeOpacity={0.8}
-                >
-                    <LinearGradient colors={["#81d4fa", "#1565c0"]} style={styles.gradientButton}>
-                        <Text style={styles.dashboardButtonText}>🏥 Hospital Dashboard</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
-            </Animated.View>
-        </LinearGradient>
+        </BackgroundWrapper>
     );
 };
 
@@ -104,13 +95,18 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        paddingHorizontal: 20,
+        padding: 16, // Apply spacing
+    },
+    content: {
+        width: "100%",
+        maxWidth: 400, // Make it mobile-friendly
+        alignItems: "center",
     },
     title: {
         fontSize: 30,
         fontWeight: "bold",
         color: "#0D47A1",
-        marginBottom: 5,
+        marginBottom: 10,
         textAlign: "center",
     },
     subtitle: {
@@ -125,7 +121,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#F0F0F0",
         borderRadius: 30,
         padding: 5,
-        width: "80%",
+        width: "100%",
         marginBottom: 30,
     },
     toggleButton: {
@@ -141,12 +137,16 @@ const styles = StyleSheet.create({
     },
     activeToggle: {
         backgroundColor: "#0288d1",
+        shadowColor: "#000",
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        shadowOffset: { width: 0, height: 2 },
     },
     activeToggleText: {
         color: "#fff",
     },
     dashboardButton: {
-        width: "85%",
+        width: "100%",
         marginBottom: 15,
         borderRadius: 12,
         overflow: "hidden",

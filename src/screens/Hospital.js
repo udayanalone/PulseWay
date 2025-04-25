@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import * as Location from "expo-location";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 
 const HospitalDashboard = () => {
+  const navigation = useNavigation();
   const route = useRoute();
-  const { hospitalName: initialHospitalName, latitude: initialLatitude, longitude: initialLongitude } = route.params || {};
+  const {
+    hospitalName: initialHospitalName,
+    latitude: initialLatitude,
+    longitude: initialLongitude,
+  } = route.params || {};
 
   const [hospitalName, setHospitalName] = useState(initialHospitalName || "");
   const [location, setLocation] = useState(null);
@@ -16,7 +29,9 @@ const HospitalDashboard = () => {
   const [longitude, setLongitude] = useState(initialLongitude || "");
   const [loading, setLoading] = useState(false);
   const [locationError, setLocationError] = useState(null);
-  const [useCurrentLocation, setUseCurrentLocation] = useState(!initialLatitude && !initialLongitude);
+  const [useCurrentLocation, setUseCurrentLocation] = useState(
+    !initialLatitude && !initialLongitude
+  );
 
   useEffect(() => {
     if (useCurrentLocation) {
@@ -51,16 +66,24 @@ const HospitalDashboard = () => {
         ? location
         : { latitude: parseFloat(latitude), longitude: parseFloat(longitude) };
 
-      await addDoc(collection(db, "hospitals"), {
+      await addDoc(collection(db, "hopamblink"), {
         name: hospitalName,
         location: hospitalLocation,
       });
 
       Alert.alert("Success", "Hospital added successfully!");
+
+      navigation.navigate("HospitalDashboardNEW", {
+        hospitalName,
+        latitude: hospitalLocation.latitude,
+        longitude: hospitalLocation.longitude,
+      });
+
       setHospitalName("");
       setLatitude("");
       setLongitude("");
     } catch (error) {
+      console.error("Error saving hospital:", error); // Log the error
       Alert.alert("Error", "Could not add hospital. Try again.");
     } finally {
       setLoading(false);

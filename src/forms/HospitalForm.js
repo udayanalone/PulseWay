@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
 import * as Location from "expo-location";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, doc, setDoc } from "firebase/firestore";
-import { getDatabase, ref, set } from "firebase/database";
+import {
+  createUserWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
+} from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { ref, set, get } from "firebase/database";
 import { auth, db, rtdb } from "../../firebase";
+import Input from "../component/Input"; // Assuming Input is a custom component
 
 const HospitalSignup = ({ navigation }) => {
   const [hospitalName, setHospitalName] = useState("");
@@ -14,14 +26,14 @@ const HospitalSignup = ({ navigation }) => {
   const [longitude, setLongitude] = useState("");
   const [locationError, setLocationError] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
+  const [loadingSignup, setLoadingSignup] = useState(false);
 
-  // 📌 Try to fetch current location on load
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          setLocationError("Permission denied. You can enter location manually.");
+          setLocationError("Permission denied. Enter location manually.");
           setLoadingLocation(false);
           return;
         }
@@ -30,20 +42,48 @@ const HospitalSignup = ({ navigation }) => {
         setLatitude(loc.coords.latitude.toString());
         setLongitude(loc.coords.longitude.toString());
       } catch (err) {
-        setLocationError("Unable to fetch location. Enter it manually.");
+        setLocationError("Unable to fetch location. Enter manually.");
       } finally {
         setLoadingLocation(false);
       }
     })();
   }, []);
 
-  const handleSignup = async () => {
+  const validateInputs = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const numberRegex = /^-?\d+(\.\d+)?$/;
+
     if (!hospitalName || !email || !password || !latitude || !longitude) {
       Alert.alert("Error", "All fields are required!");
-      return;
+      return false;
     }
 
+    if (!emailRegex.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return false;
+    }
+
+    if (!numberRegex.test(latitude) || !numberRegex.test(longitude)) {
+      Alert.alert("Invalid Location", "Latitude and Longitude must be valid numbers.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSignup = async () => {
+    if (!validateInputs()) return;
+
+    setLoadingSignup(true);
+
     try {
+      const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+      if (signInMethods.length > 0) {
+        Alert.alert("Email Exists", "Please use a different email.");
+        setLoadingSignup(false);
+        return;
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
 
@@ -63,65 +103,81 @@ const HospitalSignup = ({ navigation }) => {
         status: "active",
       });
 
-      Alert.alert("Success", "Hospital Registered!");
+      Alert.alert("Success", "Hospital Registered Successfully!");
       navigation.navigate("Hospital", { hospitalName });
     } catch (error) {
+      console.error("Signup error:", error);
       Alert.alert("Signup Failed", error.message);
+    } finally {
+      setLoadingSignup(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: "bold", textAlign: "center", marginBottom: 10 }}>🏥 Hospital Signup</Text>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <Text style={styles.title}>🏥 Hospital Signup</Text>
 
-      <TextInput placeholder="Hospital Name" value={hospitalName} onChangeText={setHospitalName} style={styles.input} />
-      <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} keyboardType="email-address" />
-      <TextInput placeholder="Password" value={password} onChangeText={setPassword} style={styles.input} secureTextEntry />
+      {locationError && <Text style={styles.errorText}>{locationError}</Text>}
+      {loadingLocation && <ActivityIndicator size="small" color="blue" />}
 
-      {loadingLocation ? (
-        <ActivityIndicator size="small" color="blue" />
-      ) : (
-        <>
-          {locationError && <Text style={{ color: "red", marginBottom: 5 }}>{locationError}</Text>}
-          <TextInput
-            placeholder="Latitude"
-            value={latitude}
-            onChangeText={setLatitude}
-            style={styles.input}
-            keyboardType="numeric"
-          />
-          <TextInput
-            placeholder="Longitude"
-            value={longitude}
-            onChangeText={setLongitude}
-            style={styles.input}
-            keyboardType="numeric"
-          />
-        </>
-      )}
+      <Input
+        placeholder="Hospital Name"
+        value={hospitalName}
+        onChangeText={setHospitalName}
+      />
+      <Input
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+      />
+      <Input
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      <Input
+        placeholder="Latitude"
+        value={latitude}
+        onChangeText={setLatitude}
+        keyboardType="numeric"
+      />
+      <Input
+        placeholder="Longitude"
+        value={longitude}
+        onChangeText={setLongitude}
+        keyboardType="numeric"
+      />
 
-      <TouchableOpacity style={styles.button} onPress={handleSignup}>
-        <Text style={{ color: "white", fontSize: 18 }}>Sign Up</Text>
-      </TouchableOpacity>
-    </View>
+      <Button
+        title={loadingSignup ? "Signing Up..." : "Sign Up"}
+        onPress={handleSignup}
+        gradientColors={["#4caf50", "#388e3c"]}
+        disabled={loadingSignup}
+      />
+    </ScrollView>
   );
 };
 
-const styles = {
-  input: {
-    borderWidth: 1,
-    padding: 10,
-    marginVertical: 8,
-    borderRadius: 5,
-    backgroundColor: "white",
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+    flexGrow: 1,
+    justifyContent: "center",
+    backgroundColor: "#f9f9f9",
   },
-  button: {
-    backgroundColor: "green",
-    padding: 12,
-    alignItems: "center",
-    borderRadius: 5,
-    marginTop: 10,
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 20,
   },
-};
+  errorText: {
+    color: "red",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+});
 
 export default HospitalSignup;
