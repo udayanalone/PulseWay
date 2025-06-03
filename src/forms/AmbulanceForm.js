@@ -4,49 +4,45 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { ref, set } from "firebase/database";
 import { auth, db, rtdb } from "../../firebase";
-import { LinearGradient } from "expo-linear-gradient";
-import { MaterialIcons } from "@expo/vector-icons";
 
 const generateAmbulanceId = () => "AMB" + Math.floor(100000 + Math.random() * 900000);
 
 const AmbulanceSignup = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Email and password are required!");
       return;
     }
-
+    if (password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters.");
+      return;
+    }
+    setLoading(true);
     try {
-      // 🔹 Firebase Authentication Signup
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
       const ambulanceId = generateAmbulanceId();
 
-      // 🔹 Store user data in Firestore
-      await setDoc(doc(db, "users", email), { userId, email, ambulanceId });
-
-      // 🔹 Store ambulance details in Realtime Database
+      await setDoc(doc(db, "users", email.trim().toLowerCase()), { userId, email, ambulanceId });
       await set(ref(rtdb, `ambulances/${userId}`), { ambulanceId, status: "active" });
 
       Alert.alert("Success", "Ambulance Registered!");
       navigation.navigate("AmbulanceDashboard", { email });
-
     } catch (error) {
       Alert.alert("Signup Failed", error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <LinearGradient
-      colors={["#4fc3f7", "#0288d1"]}
-      style={styles.gradientBackground}
-    >
+    <View style={styles.container}>
       <View style={styles.formContainer}>
         <Text style={styles.title}>🚑 Ambulance Signup</Text>
-
         <View style={{ position: "relative" }}>
           <TextInput
             placeholder="Email"
@@ -56,8 +52,8 @@ const AmbulanceSignup = ({ navigation }) => {
             keyboardType="email-address"
             placeholderTextColor="#666"
           />
-          <MaterialIcons name="email" style={styles.inputIcon} />
         </View>
+        <View>
         <TextInput
           placeholder="Password"
           value={password}
@@ -66,26 +62,12 @@ const AmbulanceSignup = ({ navigation }) => {
           style={styles.input}
           placeholderTextColor="#666"
         />
-
-        <TouchableOpacity style={styles.button} onPress={handleSignup}>
-          <LinearGradient colors={["#4fc3f7", "#0288d1"]} style={styles.gradientButton}>
-            <Text style={styles.buttonText}>Sign Up</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Already have an account?{" "}
-            <Text
-              style={styles.footerLink}
-              onPress={() => navigation.navigate("Login")}
-            >
-              Login
-            </Text>
-          </Text>
         </View>
+        <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
+          <Text style={styles.buttonText}>{loading ? "Signing Up..." : "Sign Up"}</Text>
+        </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </View>
   );
 };
 
@@ -96,12 +78,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     backgroundColor: "#f9f9f9",
-  },
-  gradientBackground: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
   },
   title: {
     fontSize: 24,
@@ -123,23 +99,16 @@ const styles = StyleSheet.create({
   },
   input: {
     width: "100%",
-    maxWidth: 400, // Mobile-friendly width
+    maxWidth: 400,
     borderWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "white",
     padding: 12,
-    paddingLeft: 40, // Add padding for icons
+    paddingLeft: 40,
     marginVertical: 8,
     borderRadius: 8,
     fontSize: 16,
     position: "relative",
-  },
-  inputIcon: {
-    position: "absolute",
-    left: 10,
-    top: 12,
-    fontSize: 20,
-    color: "#666",
   },
   button: {
     width: "100%",
@@ -147,10 +116,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     marginTop: 10,
-  },
-  gradientButton: {
-    padding: 14,
+    backgroundColor: "#0288d1",
     alignItems: "center",
+    padding: 14,
   },
   buttonText: {
     color: "white",

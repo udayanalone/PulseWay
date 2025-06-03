@@ -4,33 +4,14 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    Animated,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import BackgroundWrapper from "../component/BackgroundWrapper";
-import Button from "../component/Button"; // Assuming Button is a custom component
+import Button from "../component/Button";
 
 const IndexScreen = () => {
     const navigation = useNavigation();
     const [authType, setAuthType] = useState("login");
-    const scaleAnim = new Animated.Value(1);
-
-    const handlePressIn = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 0.95,
-            useNativeDriver: true,
-        }).start();
-    };
-
-    const handlePressOut = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 1,
-            friction: 3,
-            tension: 40,
-            useNativeDriver: true,
-        }).start();
-    };
 
     const handleDashboardNavigation = (dashboard) => {
         const routes = {
@@ -46,7 +27,6 @@ const IndexScreen = () => {
                 <Text style={styles.title}>Welcome to PulseWay</Text>
                 <Text style={styles.subtitle}>Quick, Reliable Emergency Assistance</Text>
 
-                {/* Toggle Authentication Type */}
                 <View style={styles.toggleContainer}>
                     <TouchableOpacity
                         onPress={() => setAuthType("login")}
@@ -67,52 +47,50 @@ const IndexScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Dashboard Navigation */}
-                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                    <Button
-                        title="🚑 Ambulance Dashboard"
-                        onPress={() => handleDashboardNavigation("ambulance")}
-                        gradientColors={["#4fc3f7", "#0288d1"]}
-                        onPressIn={handlePressIn}
-                        onPressOut={handlePressOut}
-                    />
+                <Button
+                    title="🚑 Ambulance Dashboard"
+                    onPress={() => handleDashboardNavigation("ambulance")}
+                    gradientColors={["#4fc3f7", "#0288d1"]}
+                    style={styles.dashboardButton}
+                    textStyle={styles.dashboardButtonText}
+                />
 
-                    <Button
-                        title="🏥 Hospital Dashboard"
-                        onPress={() => handleDashboardNavigation("hospital")}
-                        gradientColors={["#81d4fa", "#1565c0"]}
-                        onPressIn={handlePressIn}
-                        onPressOut={handlePressOut}
-                    />
-                </Animated.View>
+                <Button
+                    title="🏥 Hospital Dashboard"
+                    onPress={() => handleDashboardNavigation("hospital")}
+                    gradientColors={["#81d4fa", "#1565c0"]}
+                    style={styles.dashboardButton}
+                    textStyle={styles.dashboardButtonText}
+                />
             </View>
         </BackgroundWrapper>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 16, // Apply spacing
-    },
     content: {
+        flex: 1,
         width: "100%",
-        maxWidth: 400, // Make it mobile-friendly
+        maxWidth: 400,
         alignItems: "center",
+        justifyContent: "flex-start",
     },
     title: {
         fontSize: 30,
         fontWeight: "bold",
         color: "#0D47A1",
-        marginBottom: 10,
         textAlign: "center",
+        paddingHorizontal: 20,
+        marginTop: "10%",
+        marginBottom: 10,
+        height: "30%",
+        justifyContent: "center",
+        textAlignVertical: "center",
     },
     subtitle: {
         fontSize: 16,
         color: "#444",
-        marginBottom: 30,
+        marginBottom: 20,
         textAlign: "center",
     },
     toggleContainer: {
@@ -123,6 +101,7 @@ const styles = StyleSheet.create({
         padding: 5,
         width: "100%",
         marginBottom: 30,
+        marginTop: 20,
     },
     toggleButton: {
         flex: 1,
@@ -146,11 +125,12 @@ const styles = StyleSheet.create({
         color: "#fff",
     },
     dashboardButton: {
-        width: "100%",
+        width: 300,
         marginBottom: 15,
         borderRadius: 12,
         overflow: "hidden",
         elevation: 5,
+        alignSelf: "center",
     },
     gradientButton: {
         paddingVertical: 16,
@@ -162,5 +142,4 @@ const styles = StyleSheet.create({
         color: "#fff",
     },
 });
-
 export default IndexScreen;
