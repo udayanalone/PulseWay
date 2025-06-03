@@ -20,6 +20,10 @@ const AuthForm = ({ authType, onSubmit }) => {
                 Alert.alert('Error', 'All fields are required for Sign Up.');
                 return;
             }
+            if (password.length < 6) {
+                Alert.alert('Error', 'Password must be at least 6 characters.');
+                return;
+            }
         } else if (authType === 'login') {
             const { username, password } = formData;
             if (!username || !password) {
@@ -27,7 +31,6 @@ const AuthForm = ({ authType, onSubmit }) => {
                 return;
             }
         }
-
         onSubmit(formData);
     };
 
@@ -44,6 +47,7 @@ const AuthForm = ({ authType, onSubmit }) => {
                         placeholder="Full Name"
                         value={formData.fullName}
                         onChangeText={(text) => handleChange('fullName', text)}
+                        autoCapitalize="words"
                     />
                     <TextInput
                         style={styles.input}
@@ -51,6 +55,7 @@ const AuthForm = ({ authType, onSubmit }) => {
                         keyboardType="email-address"
                         value={formData.email}
                         onChangeText={(text) => handleChange('email', text)}
+                        autoCapitalize="none"
                     />
                 </>
             )}
@@ -60,6 +65,7 @@ const AuthForm = ({ authType, onSubmit }) => {
                 placeholder="Username"
                 value={formData.username}
                 onChangeText={(text) => handleChange('username', text)}
+                autoCapitalize="none"
             />
 
             <TextInput
@@ -110,7 +116,7 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         alignItems: 'center',
         marginTop: 20,
-        elevation: 4, // Android shadow
+        elevation: 4,
     },
     buttonText: {
         fontSize: 18,

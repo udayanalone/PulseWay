@@ -14,11 +14,13 @@ import {
   fetchSignInMethodsForEmail,
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { ref, set, get } from "firebase/database";
+import { ref, set } from "firebase/database";
+import { useNavigation } from "@react-navigation/native";
 import { auth, db, rtdb } from "../../firebase";
-import Input from "../component/Input"; // Assuming Input is a custom component
+import Input from "../component/Input";
+import Button from "../component/Button";
 
-const HospitalSignup = ({ navigation }) => {
+const HospitalSignup = () => {
   const [hospitalName, setHospitalName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,21 +30,26 @@ const HospitalSignup = ({ navigation }) => {
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [loadingSignup, setLoadingSignup] = useState(false);
 
+  const navigation = useNavigation();
+
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           setLocationError("Permission denied. Enter location manually.");
+          setLatitude("");
+          setLongitude("");
           setLoadingLocation(false);
           return;
         }
-
         const loc = await Location.getCurrentPositionAsync({});
         setLatitude(loc.coords.latitude.toString());
         setLongitude(loc.coords.longitude.toString());
       } catch (err) {
         setLocationError("Unable to fetch location. Enter manually.");
+        setLatitude("");
+        setLongitude("");
       } finally {
         setLoadingLocation(false);
       }
@@ -57,24 +64,26 @@ const HospitalSignup = ({ navigation }) => {
       Alert.alert("Error", "All fields are required!");
       return false;
     }
-
     if (!emailRegex.test(email)) {
       Alert.alert("Invalid Email", "Please enter a valid email address.");
       return false;
     }
-
+    if (password.length < 6) {
+      Alert.alert("Weak Password", "Password must be at least 6 characters.");
+      return false;
+    }
     if (!numberRegex.test(latitude) || !numberRegex.test(longitude)) {
       Alert.alert("Invalid Location", "Latitude and Longitude must be valid numbers.");
       return false;
     }
-
     return true;
   };
 
   const handleSignup = async () => {
     if (!validateInputs()) return;
-
     setLoadingSignup(true);
+
+    const normalizedHospitalName = hospitalName.trim().toLowerCase();
 
     try {
       const signInMethods = await fetchSignInMethodsForEmail(auth, email);
@@ -87,9 +96,9 @@ const HospitalSignup = ({ navigation }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
 
-      await setDoc(doc(db, "hospitals", hospitalName), {
+      await setDoc(doc(db, "hospitals", normalizedHospitalName), {
         userId,
-        hospitalName,
+        hospitalName: hospitalName.trim(),
         email,
         location: {
           latitude: parseFloat(latitude),
@@ -97,14 +106,14 @@ const HospitalSignup = ({ navigation }) => {
         },
       });
 
-      await set(ref(rtdb, `hospitals/${hospitalName}`), {
+      await set(ref(rtdb, `hospitals/${normalizedHospitalName}`), {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
         status: "active",
       });
 
       Alert.alert("Success", "Hospital Registered Successfully!");
-      navigation.navigate("Hospital", { hospitalName });
+      navigation.navigate("Hospital_Dashboard");
     } catch (error) {
       console.error("Signup error:", error);
       Alert.alert("Signup Failed", error.message);

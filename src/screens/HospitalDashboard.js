@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
 const HospitalDashboardNEW = () => {
@@ -17,17 +17,26 @@ const HospitalDashboardNEW = () => {
   const [hospitalDetails, setHospitalDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [ambulances, setAmbulances] = useState([]);
-  const [hospitalSuggestions, setHospitalSuggestions] = useState([]); // For hospital name suggestions
+  const [hospitalSuggestions, setHospitalSuggestions] = useState([]);
+  const [hospitalLocations, setHospitalLocations] = useState({});
 
   useEffect(() => {
-    fetchHospitalSuggestions(); // Fetch hospital names when the component mounts
+    fetchHospitalSuggestions();
   }, []);
 
   const fetchHospitalSuggestions = async () => {
     try {
       const hospitalDocs = await getDocs(collection(db, "hospitals"));
-      const hospitalNames = hospitalDocs.docs.map((doc) => doc.id); // Get hospital names (document IDs)
+      const hospitalNames = hospitalDocs.docs.map((doc) => doc.id);
       setHospitalSuggestions(hospitalNames);
+      const locations = {};
+      hospitalDocs.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.location) {
+          locations[doc.id] = data.location;
+        }
+      });
+      setHospitalLocations(locations);
     } catch (error) {
       console.error("Error fetching hospital suggestions:", error);
       Alert.alert("Error", "Failed to fetch hospital suggestions.");
@@ -35,38 +44,40 @@ const HospitalDashboardNEW = () => {
   };
 
   const fetchHospitalDetails = async () => {
-    if (!hospitalName.trim()) {
-      Alert.alert("Error", "Please enter a hospital name.");
-      return;
-    }
+    const HospitalName = hospitalName.trim();
 
     setLoading(true);
     try {
-      const hospitalRef = doc(db, "hopamblink", hospitalName.trim());
+      const hospitalRef = doc(db, "hopamblink", HospitalName);
       const hospitalDoc = await getDoc(hospitalRef);
 
       if (!hospitalDoc.exists()) {
-        Alert.alert("Error", "Hospital not found in Firestore.");
+        Alert.alert("Info", "No ambulance approaching this hospital yet.");
         setHospitalDetails(null);
         setAmbulances([]);
       } else {
         const hospitalData = hospitalDoc.data();
         setHospitalDetails(hospitalData);
 
+        const selectedHospitalLocation = hospitalLocations[HospitalName];
         if (hospitalData.ambulances && hospitalData.ambulances.length > 0) {
           const updatedAmbulances = hospitalData.ambulances.map((ambulance) => {
-            const distance = hospitalData.location?.latitude &&
-                             hospitalData.location?.longitude &&
-                             ambulance.location?.latitude &&
-                             ambulance.location?.longitude
-              ? getDistance(
-                  hospitalData.location.latitude,
-                  hospitalData.location.longitude,
-                  ambulance.location.latitude,
-                  ambulance.location.longitude
-                )
-              : "Unknown";
-            return { ...ambulance, distance: distance !== "Unknown" ? distance.toFixed(2) : distance };
+            const distance =
+              selectedHospitalLocation?.latitude &&
+              selectedHospitalLocation?.longitude &&
+              ambulance.location?.latitude &&
+              ambulance.location?.longitude
+                ? getDistance(
+                    selectedHospitalLocation.latitude,
+                    selectedHospitalLocation.longitude,
+                    ambulance.location.latitude,
+                    ambulance.location.longitude
+                  )
+                : "Unknown";
+            return {
+              ...ambulance,
+              distance: distance !== "Unknown" ? distance.toFixed(2) : distance,
+            };
           });
 
           setAmbulances(updatedAmbulances);
@@ -83,7 +94,7 @@ const HospitalDashboardNEW = () => {
   };
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Radius of the Earth in km
+    const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -93,13 +104,38 @@ const HospitalDashboardNEW = () => {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
+    return R * c;
+  };
+
+  const handleDeleteAmbulance = async (ambulanceId) => {
+    if (!hospitalName.trim()) return;
+    try {
+      setLoading(true);
+      const hospitalRef = doc(db, "hopamblink", hospitalName.trim());
+      const hospitalDoc = await getDoc(hospitalRef);
+      if (!hospitalDoc.exists()) {
+        Alert.alert("Error", "Hospital not found in Firestore.");
+        setLoading(false);
+        return;
+      }
+      const hospitalData = hospitalDoc.data();
+      const updatedAmbulances = (hospitalData.ambulances || []).filter(
+        (amb) => amb.ambulanceId !== ambulanceId
+      );
+      await updateDoc(hospitalRef, { ambulances: updatedAmbulances });
+      fetchHospitalDetails(); // Reload list
+    } catch (error) {
+      console.error("Error deleting ambulance:", error);
+      Alert.alert("Error", "Failed to delete ambulance.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderHospitalSuggestion = ({ item }) => (
     <TouchableOpacity
       style={styles.suggestionItem}
-      onPress={() => setHospitalName(item)} // Set the selected hospital name
+      onPress={() => setHospitalName(item)}
     >
       <Text style={styles.suggestionText}>{item}</Text>
     </TouchableOpacity>
@@ -107,10 +143,27 @@ const HospitalDashboardNEW = () => {
 
   const renderAmbulanceItem = ({ item }) => (
     <View style={styles.ambulanceItem}>
-      <Text style={styles.ambulanceText}>🚑 Ambulance ID: {item.ambulanceId}</Text>
-      <Text style={styles.ambulanceText}>
-        📍 Distance: {item.distance !== "Unknown" ? `${item.distance} KM` : "Unknown"}
-      </Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.ambulanceText}>🚑 Ambulance ID: {item.ambulanceId}</Text>
+        <Text style={styles.ambulanceText}>
+          📍 Distance: {item.distance !== "Unknown" ? `${item.distance} KM` : "Unknown"}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() =>
+          Alert.alert(
+            "Delete Ambulance",
+            "Are you sure you want to delete this ambulance?",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Delete", style: "destructive", onPress: () => handleDeleteAmbulance(item.ambulanceId) },
+            ]
+          )
+        }
+      >
+        <Text style={styles.deleteButtonText}>Delete</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -125,12 +178,11 @@ const HospitalDashboardNEW = () => {
         style={styles.input}
       />
 
-      {/* Display hospital name suggestions */}
       {hospitalSuggestions.length > 0 && hospitalName.trim() !== "" && (
         <FlatList
           data={hospitalSuggestions.filter((name) =>
             name.toLowerCase().includes(hospitalName.toLowerCase())
-          )} // Filter suggestions based on input
+          )}
           renderItem={renderHospitalSuggestion}
           keyExtractor={(item) => item}
           style={styles.suggestionsList}
@@ -254,10 +306,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    flexDirection: "row",
+    alignItems: "center",
   },
   ambulanceText: {
     fontSize: 16,
     color: "#333",
+  },
+  deleteButton: {
+    backgroundColor: "#e53935",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    marginLeft: 10,
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   noDataText: {
     fontSize: 16,
