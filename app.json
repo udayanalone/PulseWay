@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.udayan83.PulseWay",
+      "bundleIdentifier": "com.udayanalone.PulseWay",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.udayan83.PulseWay"
+      "package": "com.udayanalone.PulseWay"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,6 +34,6 @@
         "projectId": "b10b5cd3-0a9e-4cf4-a0ab-7a2411c19dd1"
       }
     },
-    "owner": "udayan83"
+    "owner": "udayanalone"
   }
 }
