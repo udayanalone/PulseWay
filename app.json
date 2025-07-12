@@ -14,11 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-<<<<<<< HEAD
-      "bundleIdentifier": "com.udayan83.PulseWay",
-=======
       "bundleIdentifier": "com.udayanalone.PulseWay",
->>>>>>> 99ebd7cb51e294b6c5aa594b6d68467e8e858b63
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -28,27 +24,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-<<<<<<< HEAD
-      "package": "com.udayan83.PulseWay"
-=======
       "package": "com.udayanalone.PulseWay"
->>>>>>> 99ebd7cb51e294b6c5aa594b6d68467e8e858b63
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-<<<<<<< HEAD
-        "projectId": "b832ae1d-a2b7-4f3b-8968-861d4e7a51a0"
-      }
-    },
-    "owner": "udayan83"
-=======
         "projectId": "b10b5cd3-0a9e-4cf4-a0ab-7a2411c19dd1"
       }
     },
     "owner": "udayanalone"
->>>>>>> 99ebd7cb51e294b6c5aa594b6d68467e8e858b63
   }
 }
