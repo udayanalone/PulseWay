@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  StatusBar,
+  Alert,
+  ActivityIndicator,
+  FlatList,
+  TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -22,13 +23,27 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import BackgroundWrapper from "../component/BackgroundWrapper";
-import Button from "../component/Button"; // Assuming Button is a custom component
-import Input from "../component/Input"; // Assuming Input is a custom component
+import Button from "../component/Button";
+import Input from "../component/Input";
+
+const getDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const AmbulanceDashboard = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { username: initialUsername, authType } = route.params || {};
+  const { username: initialUsername } = route.params || {};
 
   const [email, setEmail] = useState(initialUsername || "");
   const [password, setPassword] = useState("");
@@ -42,18 +57,17 @@ const AmbulanceDashboard = () => {
   useEffect(() => {
     let locationSubscription = null;
     if (isLoggedIn) {
-      fetchAmbulanceId();
-      const setupLocation = async () => {
-        locationSubscription = await requestLocation();
-      };
-      setupLocation();
-      fetchHospitals();
+      fetchAmbulanceId().then(() => {
+        requestLocation().then((sub) => {
+          locationSubscription = sub;
+        });
+        fetchHospitals();
+      });
     }
     return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
+      if (locationSubscription) locationSubscription.remove();
     };
+    // eslint-disable-next-line
   }, [isLoggedIn]);
 
   const handleLogin = async () => {
@@ -61,39 +75,32 @@ const AmbulanceDashboard = () => {
       Alert.alert("Error", "Email and password are required!");
       return;
     }
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
       setIsLoggedIn(true);
-      fetchAmbulanceId(user.email);
+      fetchAmbulanceId(userCredential.user.email);
     } catch (error) {
       Alert.alert("Error", "Invalid email or password. Please try again.");
     }
   };
 
-  const fetchAmbulanceId = async (email) => {
+  const fetchAmbulanceId = async (emailParam) => {
     try {
-      if (!email) {
-        email = auth.currentUser?.email;
-        if (!email) {
-          Alert.alert("Error", "User email is missing.");
-          return;
-        }
+      let emailToUse = (emailParam || email || auth.currentUser?.email || "").trim().toLowerCase();
+      if (!emailToUse) {
+        Alert.alert("Error", "User email is missing.");
+        return;
       }
-
-      const userDoc = await getDoc(doc(db, "users", email));
+      const userDoc = await getDoc(doc(db, "users", emailToUse));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        if (userData.ambulanceId) {
-          setAmbulanceId(userData.ambulanceId);
-        } else {
-          Alert.alert("Error", "Ambulance ID not found.");
-        }
+        if (userData.ambulanceId) setAmbulanceId(userData.ambulanceId);
+        else Alert.alert("Error", "Ambulance ID not found in user data.");
       } else {
-        Alert.alert("Error", "User data not found in Firestore.");
+        Alert.alert("Error", `User data not found in Firestore for email: ${emailToUse}`);
       }
     } catch (error) {
+      console.error("Failed to fetch ambulance ID:", error);
       Alert.alert("Error", "Failed to fetch ambulance ID.");
     }
   };
@@ -105,7 +112,6 @@ const AmbulanceDashboard = () => {
         Alert.alert("Error", "Permission denied. Enable location services.");
         return null;
       }
-
       const initialLocation = await Location.getCurrentPositionAsync({});
       setLocation(initialLocation.coords);
       await updateFirebaseLocation(initialLocation.coords);
@@ -154,6 +160,7 @@ const AmbulanceDashboard = () => {
         .map((doc) => ({
           id: doc.id,
           name: doc.data().name || doc.id,
+          location: doc.data().location,
           ...doc.data(),
         }))
         .filter(
@@ -170,70 +177,62 @@ const AmbulanceDashboard = () => {
     }
   };
 
-  const handleHospitalClick = async (hospital) => {
+  const sortedHospitals = location
+    ? hospitals
+        .map((hospital) => ({
+          ...hospital,
+          distance: getDistance(
+            location.latitude,
+            location.longitude,
+            hospital.location.latitude,
+            hospital.location.longitude
+          ),
+        }))
+        .sort((a, b) => a.distance - b.distance)
+    : hospitals;
+
+  const informHospital = async (hospital) => {
+    if (!hospital?.id) {
+      Alert.alert("Error", "Hospital information is missing.");
+      return;
+    }
+    if (!ambulanceId) {
+      Alert.alert("Error", "Ambulance ID missing.");
+      return;
+    }
     try {
-      const hospitalName = hospital.name.trim();
-      const hospitalRef = doc(db, "hopamblink", hospitalName);
+      const ambDoc = await getDoc(doc(db, "ambulances", ambulanceId));
+      if (!ambDoc.exists()) {
+        Alert.alert("Error", "Ambulance data not found in Firestore.");
+        return;
+      }
+      const ambData = ambDoc.data();
+
+      const hospitalRef = doc(db, "hopamblink", hospital.id);
       const hospitalDoc = await getDoc(hospitalRef);
 
-      const fullAmbulanceData = {
+      let newAmbulance = {
         ambulanceId,
-        location: {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          altitude: location.altitude,
-          altitudeAccuracy: location.altitudeAccuracy,
-          heading: location.heading,
-          speed: location.speed,
-          timestamp: location.timestamp || Date.now(),
-        },
+        location: ambData,
       };
 
-      if (!hospitalDoc.exists()) {
-        await setDoc(hospitalRef, {
-          name: hospitalName,
-          ambulances: [fullAmbulanceData],
-        });
-        Alert.alert("Success", "New hospital created and ambulance added.");
+      if (hospitalDoc.exists()) {
+        const data = hospitalDoc.data();
+        let ambulances = Array.isArray(data.ambulances) ? data.ambulances : [];
+        ambulances.push(newAmbulance);
+        await updateDoc(hospitalRef, { ambulances });
       } else {
-        const hospitalData = hospitalDoc.data();
-        const existingAmbulances = hospitalData.ambulances || [];
-
-        const index = existingAmbulances.findIndex(
-          (amb) => amb.ambulanceId === ambulanceId
-        );
-
-        if (index !== -1) {
-          existingAmbulances[index] = fullAmbulanceData;
-        } else {
-          existingAmbulances.push(fullAmbulanceData);
-        }
-
-        await updateDoc(hospitalRef, {
-          ambulances: existingAmbulances,
+        await setDoc(hospitalRef, {
+          ambulances: [newAmbulance],
+          location: hospital.location,
+          name: hospital.name,
         });
-
-        Alert.alert("Success", "Ambulance data updated.");
       }
+      Alert.alert("Success", "Ambulance informed to hospital!");
     } catch (error) {
-      console.error("Hospital save error:", error);
-      Alert.alert("Error", "Something went wrong while saving ambulance data.");
+      console.error("Error informing hospital:", error);
+      Alert.alert("Error", "Failed to inform hospital.");
     }
-  };
-
-  const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
   };
 
   return (
@@ -244,7 +243,6 @@ const AmbulanceDashboard = () => {
             <Text style={{ fontSize: 24, fontWeight: "bold", textAlign: "center" }}>
               🚑 Ambulance Login
             </Text>
-
             <Input
               placeholder="Email"
               value={email}
@@ -258,16 +256,102 @@ const AmbulanceDashboard = () => {
               secureTextEntry
             />
             <Button
-  title="Login"
-  onPress={handleLogin}
-  gradientColors={[""]}
-/>
+              title="Login"
+              onPress={handleLogin}
+              gradientColors={["#4fc3f7", "#0288d1"]}
+            />
           </View>
         ) : (
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 20, fontWeight: "bold", marginLeft: 15 }}>
               🚑 Ambulance ID: {ambulanceId || "Loading..."}
             </Text>
+            {location ? (
+              <View style={styles.mapContainer}>
+                <Text style={styles.mapTitle}>Your Current Location</Text>
+                <MapView
+                  ref={mapRef}
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }}
+                  region={{
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }}
+                  showsUserLocation
+                >
+                  <Marker
+                    coordinate={{
+                      latitude: location.latitude,
+                      longitude: location.longitude,
+                    }}
+                    title="Ambulance"
+                    description="Your current location"
+                  />
+                  {sortedHospitals.map((hospital) => (
+                    <Marker
+                      key={hospital.id}
+                      coordinate={{
+                        latitude: hospital.location.latitude,
+                        longitude: hospital.location.longitude,
+                      }}
+                      title={hospital.name}
+                      description={`Distance: ${hospital.distance?.toFixed(2) ?? "?"} km`}
+                      pinColor="blue"
+                    />
+                  ))}
+                </MapView>
+              </View>
+            ) : (
+              <ActivityIndicator size="large" color="#2196F3" style={{ marginTop: 20 }} />
+            )}
+            <Text style={styles.mapTitle}>Nearby Hospitals</Text>
+            <FlatList
+              data={sortedHospitals}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.hospitalCard}>
+                  <View style={styles.hospitalInfo}>
+                    <Text style={styles.hospitalName}>{item.name}</Text>
+                    <Text style={styles.hospitalDistance}>
+                      {item.distance !== undefined
+                        ? `${item.distance.toFixed(2)} km away`
+                        : "Distance unknown"}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.informButton}
+                    onPress={() => {
+                      Alert.alert(
+                        "Inform Hospital",
+                        `Are you sure you want to inform ${item.name}?`,
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Inform",
+                            style: "default",
+                            onPress: () => informHospital(item),
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.informButtonText}>Inform</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text style={{ textAlign: "center", color: "#888", marginTop: 10 }}>
+                  No hospitals found nearby.
+                </Text>
+              }
+            />
           </View>
         )}
       </SafeAreaView>
@@ -280,19 +364,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#2196F3",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#fff",
-  },
   loginContainer: {
     padding: 20,
     backgroundColor: "#fff",
@@ -303,33 +374,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
   },
-  input: {
-    borderWidth: 1,
-    padding: 12,
-    marginVertical: 8,
-    borderRadius: 8,
-    borderColor: "#ccc",
-    fontSize: 16,
-    backgroundColor: "#f9f9f9",
-  },
-  loginButton: {
-    backgroundColor: "#2196F3",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  loginButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
   mapContainer: {
-    height: "30%", // Map covers 30% of the screen height
+    height: 250,
     borderRadius: 15,
     margin: 15,
     borderWidth: 1,
     borderColor: "#ddd",
-    overflow: "hidden", // Ensures the map stays within the rounded corners
+    overflow: "hidden",
   },
   mapTitle: {
     fontSize: 18,
@@ -337,6 +388,7 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 15,
     marginBottom: 5,
+    marginTop: 10,
   },
   map: {
     flex: 1,
@@ -358,11 +410,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
   },
-  hospitalIcon: {
-    fontSize: 24,
-    color: "#007bff",
-    marginRight: 10,
-  },
   hospitalInfo: {
     flex: 1,
   },
@@ -375,30 +422,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
-  loadingIndicator: {
-    marginTop: 20,
+  informButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    marginLeft: 10,
   },
-  footer: {
-    padding: 15,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderColor: "#ddd",
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: 14,
-    color: "#666",
-  },
-  footerButton: {
-    marginTop: 10,
-    backgroundColor: "#2196F3",
-    padding: 10,
-    borderRadius: 8,
-  },
-  footerButtonText: {
+  informButtonText: {
     color: "#fff",
-    fontSize: 16,
     fontWeight: "bold",
+    fontSize: 16,
   },
 });
 

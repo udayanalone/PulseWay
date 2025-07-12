@@ -83,7 +83,7 @@ const HospitalDashboard = () => {
       setLatitude("");
       setLongitude("");
     } catch (error) {
-      console.error("Error saving hospital:", error); // Log the error
+      console.error("Error saving hospital:", error); 
       Alert.alert("Error", "Could not add hospital. Try again.");
     } finally {
       setLoading(false);
