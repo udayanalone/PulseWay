@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ZatPAt",
-    "slug": "ZatPAt",
+    "name": "PulseWay",
+    "slug": "PulseWay",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,16 +13,27 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.udayan83.PulseWay",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.udayan83.PulseWay"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b832ae1d-a2b7-4f3b-8968-861d4e7a51a0"
+      }
+    },
+    "owner": "udayan83"
   }
 }
